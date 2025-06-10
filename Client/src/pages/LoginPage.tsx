@@ -38,7 +38,7 @@ const LoginPage: React.FC = () => {
             <Video className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">Welcome back</h1>
-          <p className="text-gray-300">Sign in to your Riverside account</p>
+          <p className="text-gray-300">Sign in to your Lakeside account</p>
         </div>
 
         {/* Login Form */}
