@@ -1,22 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { 
-  Mic, 
-  MicOff, 
-  Video, 
-  VideoOff, 
-  Monitor, 
-  Users, 
-  MessageSquare, 
-  Settings, 
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import { PeerService } from "../utils/peer";
+import {
+  Mic,
+  MicOff,
+  Video,
+  VideoOff,
+  Monitor,
+  Users,
+  MessageSquare,
+  Settings,
   Phone,
   MoreHorizontal,
   Grid3x3,
   Maximize,
   Volume2,
-  VolumeX
-} from 'lucide-react';
+  VolumeX,
+} from "lucide-react";
 
 interface Participant {
   id: string;
@@ -31,52 +32,33 @@ const VideoCall: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
-  
+
   const [isMuted, setIsMuted] = useState(false);
   const [hasVideo, setHasVideo] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
   const [showChat, setShowChat] = useState(false);
-  const [participants, setParticipants] = useState<Participant[]>([
-    {
-      id: '1',
-      name: user?.name || 'You',
-      avatar: user?.avatar || '',
-      isMuted: false,
-      hasVideo: true,
-      isHost: true
-    },
-    {
-      id: '2',
-      name: 'Sarah Chen',
-      avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=1',
-      isMuted: false,
-      hasVideo: true,
-      isHost: false
-    },
-    {
-      id: '3',
-      name: 'Mike Johnson',
-      avatar: 'https://images.pexels.com/photos/614810/pexels-photo-614810.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=1',
-      isMuted: true,
-      hasVideo: false,
-      isHost: false
-    },
-    {
-      id: '4',
-      name: 'Emily Davis',
-      avatar: 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=1',
-      isMuted: false,
-      hasVideo: true,
-      isHost: false
+
+  async function playVideoFromCamera() {
+    try {
+      const constraints = { video: true, audio: true };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      return stream;
+    } catch (error) {
+      console.error("Error opening video camera.", error);
     }
-  ]);
+  }
+
+  const [self_connection,setSelfConnection] = useState(new PeerService());
+
+  
+
 
   const [callDuration, setCallDuration] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setCallDuration(prev => prev + 1);
+      setCallDuration((prev) => prev + 1);
     }, 1000);
 
     return () => clearInterval(timer);
@@ -86,24 +68,26 @@ const VideoCall: React.FC = () => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    
+
     if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      return `${hours}:${minutes.toString().padStart(2, "0")}:${secs
+        .toString()
+        .padStart(2, "0")}`;
     }
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    return `${minutes}:${secs.toString().padStart(2, "0")}`;
   };
 
   const toggleMute = () => {
     setIsMuted(!isMuted);
-    setParticipants(prev => 
-      prev.map(p => p.id === '1' ? { ...p, isMuted: !isMuted } : p)
+    setParticipants((prev) =>
+      prev.map((p) => (p.id === "1" ? { ...p, isMuted: !isMuted } : p))
     );
   };
 
   const toggleVideo = () => {
     setHasVideo(!hasVideo);
-    setParticipants(prev => 
-      prev.map(p => p.id === '1' ? { ...p, hasVideo: !hasVideo } : p)
+    setParticipants((prev) =>
+      prev.map((p) => (p.id === "1" ? { ...p, hasVideo: !hasVideo } : p))
     );
   };
 
@@ -112,7 +96,7 @@ const VideoCall: React.FC = () => {
   };
 
   const leaveCall = () => {
-    navigate('/dashboard');
+    navigate("/dashboard");
   };
 
   return (
@@ -127,7 +111,7 @@ const VideoCall: React.FC = () => {
               <span>Live • {formatTime(callDuration)}</span>
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-3">
             <button
               onClick={() => setShowParticipants(!showParticipants)}
@@ -136,11 +120,11 @@ const VideoCall: React.FC = () => {
               <Users className="w-4 h-4" />
               <span>{participants.length}</span>
             </button>
-            
+
             <button className="p-2 text-gray-400 hover:text-white transition-colors">
               <Grid3x3 className="w-5 h-5" />
             </button>
-            
+
             <button className="p-2 text-gray-400 hover:text-white transition-colors">
               <Maximize className="w-5 h-5" />
             </button>
@@ -154,7 +138,10 @@ const VideoCall: React.FC = () => {
         <div className="flex-1 p-4">
           <div className="grid grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-4 h-full">
             {participants.map((participant) => (
-              <div key={participant.id} className="relative bg-gray-800 rounded-2xl overflow-hidden">
+              <div
+                key={participant.id}
+                className="relative bg-gray-800 rounded-2xl overflow-hidden"
+              >
                 {participant.hasVideo ? (
                   <div className="w-full h-full bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
                     <img
@@ -169,11 +156,13 @@ const VideoCall: React.FC = () => {
                       <div className="w-20 h-20 bg-gray-600 rounded-full flex items-center justify-center mb-3 mx-auto">
                         <VideoOff className="w-8 h-8 text-gray-400" />
                       </div>
-                      <p className="text-gray-300 font-medium">{participant.name}</p>
+                      <p className="text-gray-300 font-medium">
+                        {participant.name}
+                      </p>
                     </div>
                   </div>
                 )}
-                
+
                 {/* Participant Info */}
                 <div className="absolute bottom-4 left-4 flex items-center space-x-2">
                   <div className="bg-black/50 backdrop-blur-sm px-3 py-1 rounded-full flex items-center space-x-2">
@@ -182,9 +171,13 @@ const VideoCall: React.FC = () => {
                     ) : (
                       <Mic className="w-4 h-4 text-green-400" />
                     )}
-                    <span className="text-white text-sm font-medium">{participant.name}</span>
+                    <span className="text-white text-sm font-medium">
+                      {participant.name}
+                    </span>
                     {participant.isHost && (
-                      <span className="text-xs bg-yellow-500 px-2 py-0.5 rounded-full text-black font-medium">HOST</span>
+                      <span className="text-xs bg-yellow-500 px-2 py-0.5 rounded-full text-black font-medium">
+                        HOST
+                      </span>
                     )}
                   </div>
                 </div>
@@ -213,10 +206,15 @@ const VideoCall: React.FC = () => {
             <div className="p-4">
               {showParticipants && (
                 <div>
-                  <h3 className="text-white font-semibold mb-4">Participants ({participants.length})</h3>
+                  <h3 className="text-white font-semibold mb-4">
+                    Participants ({participants.length})
+                  </h3>
                   <div className="space-y-3">
                     {participants.map((participant) => (
-                      <div key={participant.id} className="flex items-center space-x-3 p-3 bg-gray-700/30 rounded-lg">
+                      <div
+                        key={participant.id}
+                        className="flex items-center space-x-3 p-3 bg-gray-700/30 rounded-lg"
+                      >
                         <img
                           src={participant.avatar}
                           alt={participant.name}
@@ -224,9 +222,13 @@ const VideoCall: React.FC = () => {
                         />
                         <div className="flex-1">
                           <div className="flex items-center space-x-2">
-                            <span className="text-white font-medium">{participant.name}</span>
+                            <span className="text-white font-medium">
+                              {participant.name}
+                            </span>
                             {participant.isHost && (
-                              <span className="text-xs bg-yellow-500 px-2 py-0.5 rounded-full text-black font-medium">HOST</span>
+                              <span className="text-xs bg-yellow-500 px-2 py-0.5 rounded-full text-black font-medium">
+                                HOST
+                              </span>
                             )}
                           </div>
                           <div className="flex items-center space-x-2 mt-1">
@@ -258,9 +260,9 @@ const VideoCall: React.FC = () => {
           <button
             onClick={toggleMute}
             className={`p-4 rounded-full transition-all duration-200 ${
-              isMuted 
-                ? 'bg-red-500 hover:bg-red-600' 
-                : 'bg-gray-700 hover:bg-gray-600'
+              isMuted
+                ? "bg-red-500 hover:bg-red-600"
+                : "bg-gray-700 hover:bg-gray-600"
             }`}
           >
             {isMuted ? (
@@ -273,9 +275,9 @@ const VideoCall: React.FC = () => {
           <button
             onClick={toggleVideo}
             className={`p-4 rounded-full transition-all duration-200 ${
-              !hasVideo 
-                ? 'bg-red-500 hover:bg-red-600' 
-                : 'bg-gray-700 hover:bg-gray-600'
+              !hasVideo
+                ? "bg-red-500 hover:bg-red-600"
+                : "bg-gray-700 hover:bg-gray-600"
             }`}
           >
             {hasVideo ? (
@@ -288,9 +290,9 @@ const VideoCall: React.FC = () => {
           <button
             onClick={toggleScreenShare}
             className={`p-4 rounded-full transition-all duration-200 ${
-              isScreenSharing 
-                ? 'bg-blue-500 hover:bg-blue-600' 
-                : 'bg-gray-700 hover:bg-gray-600'
+              isScreenSharing
+                ? "bg-blue-500 hover:bg-blue-600"
+                : "bg-gray-700 hover:bg-gray-600"
             }`}
           >
             <Monitor className="w-6 h-6 text-white" />
