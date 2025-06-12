@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { PeerService } from "../utils/peer";
+import { useSoc } from "../hooks/usesoc";
 import {
   Mic,
   MicOff,
@@ -39,9 +40,12 @@ const VideoCall: React.FC = () => {
   const [showParticipants, setShowParticipants] = useState(false);
   const [showChat, setShowChat] = useState(false);
 
+  const [soc, setSoc] = useState(useSoc());
+  const peerManagerRef = useRef<PeerService>(new PeerService(soc));
+
   async function playVideoFromCamera() {
     try {
-      const constraints = { video: true, audio: true };
+      const constraints = { video: hasVideo, audio: isMuted };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       return stream;
     } catch (error) {
@@ -49,14 +53,21 @@ const VideoCall: React.FC = () => {
     }
   }
 
-  const [self_connection,setSelfConnection] = useState(new PeerService());
-
-  
-
+  useEffect(() => {
+   /*  soc.on("rtc", (m: any) => {
+      peerManagerRef.current.handleSignal(m.data);
+    }); */
+    soc.onmessage =(m:any)=>{ 
+      const message  = JSON.parse(m); 
+      peerManagerRef.current.handleSignal(message.data);
+      
+    }
+  }, [soc]);
 
   const [callDuration, setCallDuration] = useState(0);
 
   useEffect(() => {
+    peerManagerRef.current.addPeer();
     const timer = setInterval(() => {
       setCallDuration((prev) => prev + 1);
     }, 1000);

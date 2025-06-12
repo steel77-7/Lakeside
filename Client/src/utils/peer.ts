@@ -1,155 +1,92 @@
-/* 
+import WebSocket from "ws";
+import { v4 as uuidv4 } from "uuid";
 
-
-type SignalMessage =
-  | { type: 'offer'; from: string; sdp: RTCSessionDescriptionInit }
-  | { type: 'answer'; from: string; sdp: RTCSessionDescriptionInit }
-  | { type: 'ice-candidate'; from: string; candidate: RTCIceCandidateInit };
-
-type RemoteStreamCallback = (peerId: string, stream: MediaStream) => void;
-
-export class PeerManager {
-  private localStream: MediaStream;
-  private peers: Map<string, RTCPeerConnection> = new Map();
-  private onRemoteStream: RemoteStreamCallback;
-  private sendSignal: (to: string, message: SignalMessage) => void;
-
-  constructor(
-    localStream: MediaStream,
-    onRemoteStream: RemoteStreamCallback,
-    sendSignal: (to: string, message: SignalMessage) => void
-  ) {
-    this.localStream = localStream;
-    this.onRemoteStream = onRemoteStream;
-    this.sendSignal = sendSignal;
+export class PeerService {
+  private ws: WebSocket;
+  private peerList: Map<string, RTCPeerConnection>;
+  constructor(soc: WebSocket) {
+    this.peerList = new Map<string, RTCPeerConnection>();
+    this.ws = soc;
   }
 
-  addPeer(peerId: string, isInitiator: boolean) {
-    if (this.peers.has(peerId)) return;
+  async addPeer() {
+    // if (this.peerList.has(peerID)) return;
+    const peerID = uuidv4();
 
-    const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' }
-      ]
-    });
-
-    this.localStream.getTracks().forEach(track => {
-      pc.addTrack(track, this.localStream);
-    });
-
-    pc.onicecandidate = (event) => {
+    const pc = new RTCPeerConnection();
+    pc.onicecandidate = (event: any) => {
       if (event.candidate) {
-        this.sendSignal(peerId, {
-          type: 'ice-candidate',
-          from: peerId,
-          candidate: event.candidate
-        });
+        this.ws.send(
+          JSON.stringify({
+            type: "ice-candidate",
+            payload: {
+              candidate: event.candidate,
+            },
+          })
+        );
       }
     };
-
-    pc.ontrack = (event) => {
-      const [stream] = event.streams;
-      this.onRemoteStream(peerId, stream);
-    };
-
-    this.peers.set(peerId, pc);
-
-    if (isInitiator) {
-      pc.createOffer()
-        .then(offer => pc.setLocalDescription(offer))
-        .then(() => {
-          this.sendSignal(peerId, {
-            type: 'offer',
-            from: peerId,
-            sdp: pc.localDescription!
-          });
-        });
-    }
+    let offer = await pc.createOffer();
+    await pc.setLocalDescription(new RTCSessionDescription(offer));
+    this.ws.send(
+      JSON.stringify({
+        type: "offer",
+        payload: {
+          peerID,
+          SPD: offer,
+        },
+      })
+    );
+    this.peerList.set(peerID, pc);
   }
 
-  async handleSignal(from: string, message: SignalMessage) {
-    let pc = this.peers.get(from);
-
+  async handleSignal(message: any) {
+    let message_type = message.type;
+    let pc = this.peerList.get(message.payload.sender);
     if (!pc) {
-      this.addPeer(from, false);
-      pc = this.peers.get(from)!;
+      console.log("peer connection not found ");
+      return;
     }
-
-    if (message.type === 'offer') {
-      await pc.setRemoteDescription(new RTCSessionDescription(message.sdp));
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      this.sendSignal(from, {
-        type: 'answer',
-        from,
-        sdp: pc.localDescription!
-      });
-    } else if (message.type === 'answer') {
-      await pc.setRemoteDescription(new RTCSessionDescription(message.sdp));
-    } else if (message.type === 'ice-candidate') {
-      await pc.addIceCandidate(new RTCIceCandidate(message.candidate));
+    switch (message_type) {
+      case "offer":
+        const peerConnection = new RTCPeerConnection();
+        await peerConnection.setRemoteDescription(
+          new RTCSessionDescription(message.payload.SDP)
+        );
+        const answer = peerConnection.createAnswer();
+        this.ws.send(
+          JSON.stringify({
+            type: "answer",
+            payload: {
+              peerID: message.payload.peerID,
+              SDP: answer,
+            },
+          })
+        );
+        this.peerList.set(message.payload.peerID, peerConnection);
+        break;
+      case "answer":
+        pc?.setRemoteDescription(
+          new RTCSessionDescription(message.payload.SDP)
+        );
+        break;
+      case "ice-candidate":
+        pc?.addIceCandidate(new RTCIceCandidate(message.event.candidate));
+        break;
     }
   }
 
-  closePeer(peerId: string) {
-    const pc = this.peers.get(peerId);
-    if (pc) {
-      pc.close();
-      this.peers.delete(peerId);
-    }
+  closePeer(peerID: string) {
+    const pc = this.peerList.get(peerID);
+    pc?.close();
+    this.peerList.delete(peerID);
   }
 
   closeAll() {
-    this.peers.forEach((pc, peerId) => {
+    this.peerList.forEach((pc, peerId) => {
       pc.close();
     });
-    this.peers.clear();
+    this.peerList.clear();
   }
 }
- */
-
-
-
-export class PeerService {
-  private peer: RTCPeerConnection;
-  constructor() {
-
-   
-      this.peer = new RTCPeerConnection({
-        iceServers: [
-          {
-            urls: [
-              "stun:stun.l.google.com:19302",
-              "stun:global.stun.twilio.com:3478",
-            ],
-          },
-        ],
-      });
-    
-  }
-
-  async getAnswer(offer:RTCSessionDescription) {
-    if (this.peer) {
-      await this.peer.setRemoteDescription(offer);
-      const ans = await this.peer.createAnswer();
-      await this.peer.setLocalDescription(new RTCSessionDescription(ans));
-      return ans;
-    }                   
-  }
-
-  async setLocalDescription(ans:RTCSessionDescription) {
-    if (this.peer) {
-      await this.peer.setRemoteDescription(new RTCSessionDescription(ans));
-    }
-  }
-
-  async getOffer() {
-    if (this.peer) {
-      const offer = await this.peer.createOffer();
-      await this.peer.setLocalDescription(new RTCSessionDescription(offer));
-      return offer;
-    }
-  }
-}
-
-export default new PeerService();
+export default PeerService;

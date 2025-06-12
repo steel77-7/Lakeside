@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import WebSocket from "ws";
-export const usesoc = () => {
+export const useSoc = () => {
   const ws = new WebSocket(import.meta.env.VITE_SOCKET_URL);
   useEffect(() => {
     ws.onopen = () => {
@@ -12,7 +12,11 @@ export const usesoc = () => {
     ws.onclose = (message) => {
       console.log(`message recieved: ${message}`);
     };
-    ws.send("connecnted"); 
-  });
-  return [];
+
+    ws.send(JSON.stringify({ type: "connect", payload: {} }));
+    return () => {
+      ws.close();
+    };
+  }, []);
+  return ws;
 };
