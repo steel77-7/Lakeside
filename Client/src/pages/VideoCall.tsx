@@ -64,7 +64,7 @@ const VideoCall: React.FC = () => {
   ]);
 
   const soc = useSoc();
-  const peerManagerRef = useRef<PeerService>(new PeerService(soc));
+  const peerManagerRef = useRef<PeerService>(new PeerService(soc.current as WebSocket));
 
   async function playVideoFromCamera() {
     try {
@@ -77,11 +77,9 @@ const VideoCall: React.FC = () => {
   }
 
   useEffect(() => {
-    /*  soc.on("rtc", (m: any) => {
-      peerManagerRef.current.handleSignal(m.data);
-    }); */
-    if(soc instanceof WebSocket){
-      soc.onmessage = (m: any) => {
+    if(!soc.current) return
+    if(soc.current?.readyState===WebSocket.OPEN){
+      soc.current.onmessage = (m: any) => {
         const message = JSON.parse(m.data);
         if (message.type === "rtc")
           peerManagerRef.current.handleSignal(message.data);
@@ -90,8 +88,10 @@ const VideoCall: React.FC = () => {
   }, [soc]);
 
   useEffect(() => {
-    if(soc instanceof WebSocket){
-      soc.send(
+    const socket = soc.current;
+    if (!socket) return;
+    if(soc.current && soc.current?.readyState===WebSocket.OPEN){
+      soc.current.send(
         JSON.stringify({
           type: "create-room",
           room_id: searchParams.get("room_id"),

@@ -3,10 +3,9 @@ import { v4 as uuidv4 } from "uuid";
 export class PeerService {
   private ws: WebSocket;
   private peerList: Map<string, RTCPeerConnection>;
-  constructor(soc: WebSocket, ) {
+  constructor(soc: WebSocket ) {
     this.peerList = new Map<string, RTCPeerConnection>();
     this.ws = soc;
-  
   }
 
   async addPeer() {
@@ -15,7 +14,7 @@ export class PeerService {
 
     const pc = new RTCPeerConnection();
     pc.onicecandidate = (event: any) => {
-      if (event.candidate && this.ws) {
+      if (event.candidate && this.ws.readyState === WebSocket.OPEN) {
         this.ws.send(
           JSON.stringify({
             type: "ice-candidate",
@@ -29,15 +28,17 @@ export class PeerService {
     };
     let offer = await pc.createOffer();
     await pc.setLocalDescription(new RTCSessionDescription(offer));
-    this.ws.send(
-      JSON.stringify({
-        type: "offer",
-        payload: {
-          peerID,
-          SPD: offer,
-        },
-      })
-    );
+    if(this.ws && this.ws.readyState===WebSocket.OPEN){
+      this.ws.send(
+        JSON.stringify({
+          type: "offer",
+          payload: {
+            peerID,
+            SPD: offer,
+          },
+        })
+      );
+    }
     this.peerList.set(peerID, pc);
   }
 
@@ -55,15 +56,17 @@ export class PeerService {
           new RTCSessionDescription(message.payload.SDP)
         );
         const answer = peerConnection.createAnswer();
-        this.ws.send(
-          JSON.stringify({
-            type: "answer",
-            payload: {
-              peerID: message.payload.peerID,
-              SDP: answer,
-            },
-          })
-        );
+        if(this.ws.readyState===WebSocket.OPEN){
+          this.ws.send(
+            JSON.stringify({
+              type: "answer",
+              payload: {
+                peerID: message.payload.peerID,
+                SDP: answer,
+              },
+            })
+          );
+        }
         this.peerList.set(message.payload.peerID, peerConnection);
         break;
       case "answer":
