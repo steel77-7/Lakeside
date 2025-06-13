@@ -85,7 +85,7 @@ const VideoCall: React.FC = () => {
           peerManagerRef.current.handleSignal(message.data);
       };
     }
-  }, [soc]);
+  }, [soc.current]);
 
   useEffect(() => {
     const socket = soc.current;
@@ -94,7 +94,7 @@ const VideoCall: React.FC = () => {
       soc.current.send(
         JSON.stringify({
           type: "create-room",
-          room_id: searchParams.get("room_id"),
+          room_id: roomId,
         })
       );
     }
@@ -105,7 +105,7 @@ const VideoCall: React.FC = () => {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [soc.current]);
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
