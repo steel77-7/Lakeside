@@ -34,7 +34,11 @@ class RoomManager:
             if len(self.rooms[room_id]) == 0:
                 del self.rooms[room_id]
 
+
+
 manager = RoomManager()
+
+
 
 @app.get("/")
 async def root():
@@ -52,5 +56,6 @@ async def websocket_endpoint(websocket: WebSocket):
             room_id = res_json.get("room_id")
             await manager.connect(websocket, room_id)
             await manager.handle_message(res_json, room_id)
+            
     except WebSocketDisconnect:
         print("Client disconnected")

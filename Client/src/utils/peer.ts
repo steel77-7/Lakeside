@@ -1,12 +1,12 @@
-import WebSocket from "ws";
 import { v4 as uuidv4 } from "uuid";
 
 export class PeerService {
   private ws: WebSocket;
   private peerList: Map<string, RTCPeerConnection>;
-  constructor(soc: WebSocket) {
+  constructor(soc: WebSocket, ) {
     this.peerList = new Map<string, RTCPeerConnection>();
     this.ws = soc;
+  
   }
 
   async addPeer() {
@@ -21,6 +21,7 @@ export class PeerService {
             type: "ice-candidate",
             payload: {
               candidate: event.candidate,
+              peerID
             },
           })
         );

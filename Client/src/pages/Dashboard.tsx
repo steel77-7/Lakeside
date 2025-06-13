@@ -27,6 +27,8 @@ const Dashboard: React.FC = () => {
 
   const createNewCall = () => {
     const roomId = Math.random().toString(36).substring(2, 15);
+    //send the room id here 
+    
     navigate(`/call/${roomId}`);
   };
 

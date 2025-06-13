@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { useSearchParams } from "react-router-dom";
 import { PeerService } from "../utils/peer";
 import { useSoc } from "../hooks/usesoc";
 import {
@@ -39,13 +40,35 @@ const VideoCall: React.FC = () => {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [callDuration, setCallDuration] = useState(0);
+  const [searchParams] = useSearchParams();
+  // Add participants state that was missing
+  const [participants, setParticipants] = useState<Participant[]>([
+    {
+      id: "1",
+      name: user?.name || "You",
+      avatar: user?.avatar || "/api/placeholder/150/150",
+      isMuted: false,
+      hasVideo: true,
+      isHost: true,
+    },
+    // Add sample participants for demo
+    {
+      id: "2",
+      name: "John Doe",
+      avatar: "/api/placeholder/150/150",
+      isMuted: false,
+      hasVideo: true,
+      isHost: false,
+    },
+  ]);
 
   const [soc, setSoc] = useState(useSoc());
   const peerManagerRef = useRef<PeerService>(new PeerService(soc));
 
   async function playVideoFromCamera() {
     try {
-      const constraints = { video: hasVideo, audio: isMuted };
+      const constraints = { video: hasVideo, audio: !isMuted };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       return stream;
     } catch (error) {
@@ -54,19 +77,24 @@ const VideoCall: React.FC = () => {
   }
 
   useEffect(() => {
-   /*  soc.on("rtc", (m: any) => {
+    /*  soc.on("rtc", (m: any) => {
       peerManagerRef.current.handleSignal(m.data);
     }); */
-    soc.onmessage =(m:any)=>{ 
-      const message  = JSON.parse(m); 
-      peerManagerRef.current.handleSignal(message.data);
-      
-    }
+    soc.onmessage = (m: any) => {
+      const message = JSON.parse(m.data);
+      if (message.type === "rtc")
+        peerManagerRef.current.handleSignal(message.data);
+    };
   }, [soc]);
 
-  const [callDuration, setCallDuration] = useState(0);
-
   useEffect(() => {
+    soc.send(
+      JSON.stringify({
+        type: "create-room",
+        room_id: searchParams.get("room_id"),
+      })
+    );
+
     peerManagerRef.current.addPeer();
     const timer = setInterval(() => {
       setCallDuration((prev) => prev + 1);
