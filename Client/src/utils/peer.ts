@@ -15,7 +15,7 @@ export class PeerService {
 
     const pc = new RTCPeerConnection();
     pc.onicecandidate = (event: any) => {
-      if (event.candidate) {
+      if (event.candidate && this.ws) {
         this.ws.send(
           JSON.stringify({
             type: "ice-candidate",
