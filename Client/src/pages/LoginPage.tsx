@@ -7,26 +7,18 @@ const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
-  const { login } = useAuth();
+
+  const { login,loading } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
-
     const success = await login(email, password);
-    
     if (success) {
       navigate('/dashboard');
-    } else {
-      setError('Invalid credentials. Please try again.');
     }
-    
-    setLoading(false);
   };
 
   return (

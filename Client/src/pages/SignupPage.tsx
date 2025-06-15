@@ -4,38 +4,31 @@ import { useAuth } from '../contexts/AuthContext';
 import { Video, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 
 const SignupPage: React.FC = () => {
-  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
-  const { signup } = useAuth();
+  const { signup,loading } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
 
     if (password !== confirmPassword) {
       setError('Passwords do not match');
-      setLoading(false);
       return;
     }
 
-    const success = await signup(name, email, password);
+    const success = await signup(username, email, password);
     
     if (success) {
-      navigate('/dashboard');
-    } else {
-      setError('Failed to create account. Please try again.');
+      navigate('/login');
     }
-    
-    setLoading(false);
   };
 
   return (
@@ -61,16 +54,16 @@ const SignupPage: React.FC = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-200 mb-2">
-                Full name
+                Username
               </label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   className="w-full pl-11 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
-                  placeholder="Enter your full name"
+                  placeholder="Enter username"
                   required
                 />
               </div>
