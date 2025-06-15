@@ -2,22 +2,33 @@ import { useEffect, useRef } from "react";
 
 export const useSoc = () => {
   const ws = useRef<WebSocket | null>(null);
+
   useEffect(() => {
-    ws.current = new WebSocket(import.meta.env.VITE_SOCKET_URL);
-    ws.current.onopen = () => {
-      console.log("connection opened");
+    const socket = new WebSocket(import.meta.env.VITE_SOCKET_URL);
+    ws.current = socket;
+
+    socket.onopen = () => {
+      console.log("WebSocket connection opened");
     };
-    ws.current.onmessage = (message: any) => {
-      console.log(`message recieved: ${message}`);
+
+    socket.onmessage = (event: MessageEvent) => {
+      console.log("WebSocket message received:", event.data);
     };
-    ws.current.onclose = (message: any) => {
-      console.log(`message recieved: ${message}`);
+
+    socket.onclose = (event: CloseEvent) => {
+      console.warn("WebSocket closed:", event.code, event.reason);
     };
+
+    socket.onerror = (error: Event) => {
+      console.error("WebSocket error:", error);
+    };
+
     return () => {
       if (ws.current?.readyState === WebSocket.OPEN) {
         ws.current.close();
       }
     };
   }, []);
+
   return ws;
 };

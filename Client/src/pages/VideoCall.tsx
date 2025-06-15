@@ -42,6 +42,7 @@ const VideoCall: React.FC = () => {
   const [showChat, setShowChat] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [searchParams] = useSearchParams();
+  const localVideoRef = useRef<HTMLVideoElement>(null);
   // Add participants state that was missing
   const [participants, setParticipants] = useState<Participant[]>([
     {
@@ -52,7 +53,6 @@ const VideoCall: React.FC = () => {
       hasVideo: true,
       isHost: true,
     },
-    // Add sample participants for demo
     {
       id: "2",
       name: "John Doe",
@@ -65,27 +65,46 @@ const VideoCall: React.FC = () => {
 
   async function playVideoFromCamera() {
     try {
-      const constraints = { video: hasVideo, audio: !isMuted };
+      const constraints: MediaStreamConstraints = {
+        video: {
+          width: { ideal: 1280 },     
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 },   
+          facingMode: "user",        
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 44100,
+        },
+      };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       return stream;
     } catch (error) {
       console.error("Error opening video camera.", error);
     }
   }
+
   const soc = useSoc();
 
   // const peerManagerRef = useRef<PeerService |null >(new PeerService(soc.current as WebSocket,playVideoFromCamera().then(r=>{return r})));
   const peerManagerRef = useRef<PeerService | null>(null);
 
-  useEffect(() => {
-    async function initializeStream() {
-      peerManagerRef.current = new PeerService(
-        soc.current as WebSocket,
-        await playVideoFromCamera()
-      );
+  async function initializeStream() {
+    const stream = await playVideoFromCamera();
+    if (stream && localVideoRef.current) {
+      localVideoRef.current.srcObject = stream;
     }
-     initializeStream()
-  }, []);
+    peerManagerRef.current = new PeerService(
+      soc.current as WebSocket,
+      stream
+    );
+  }
+
+  useEffect(() => {
+    initializeStream()
+  }, [participants]);
+
   useEffect(() => {
     if (!soc.current) return;
     if (soc.current?.readyState === WebSocket.OPEN) {
@@ -196,11 +215,22 @@ const VideoCall: React.FC = () => {
               >
                 {participant.hasVideo ? (
                   <div className="w-full h-full bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-                    <img
-                      src={participant.avatar}
-                      alt={participant.name}
-                      className="w-32 h-32 rounded-full object-cover"
-                    />
+                    {
+                      participant.id === '1' ?
+                        <video
+                          ref={localVideoRef}
+                          autoPlay
+                          muted={participant.isMuted}
+                          playsInline
+                          className="w-full h-full object-cover rounded-2xl transform scale-x-[-1]"
+                        /> : (
+                          <img
+                            src={participant.avatar}
+                            alt={participant.name}
+                            className="w-32 h-32 rounded-full object-cover"
+                          />
+                        )
+                    }
                   </div>
                 ) : (
                   <div className="w-full h-full bg-gray-700 flex items-center justify-center">
@@ -311,11 +341,10 @@ const VideoCall: React.FC = () => {
         <div className="flex items-center justify-center space-x-4">
           <button
             onClick={toggleMute}
-            className={`p-4 rounded-full transition-all duration-200 ${
-              isMuted
-                ? "bg-red-500 hover:bg-red-600"
-                : "bg-gray-700 hover:bg-gray-600"
-            }`}
+            className={`p-4 rounded-full transition-all duration-200 ${isMuted
+              ? "bg-red-500 hover:bg-red-600"
+              : "bg-gray-700 hover:bg-gray-600"
+              }`}
           >
             {isMuted ? (
               <MicOff className="w-6 h-6 text-white" />
@@ -326,11 +355,10 @@ const VideoCall: React.FC = () => {
 
           <button
             onClick={toggleVideo}
-            className={`p-4 rounded-full transition-all duration-200 ${
-              !hasVideo
-                ? "bg-red-500 hover:bg-red-600"
-                : "bg-gray-700 hover:bg-gray-600"
-            }`}
+            className={`p-4 rounded-full transition-all duration-200 ${!hasVideo
+              ? "bg-red-500 hover:bg-red-600"
+              : "bg-gray-700 hover:bg-gray-600"
+              }`}
           >
             {hasVideo ? (
               <Video className="w-6 h-6 text-white" />
@@ -341,11 +369,10 @@ const VideoCall: React.FC = () => {
 
           <button
             onClick={toggleScreenShare}
-            className={`p-4 rounded-full transition-all duration-200 ${
-              isScreenSharing
-                ? "bg-blue-500 hover:bg-blue-600"
-                : "bg-gray-700 hover:bg-gray-600"
-            }`}
+            className={`p-4 rounded-full transition-all duration-200 ${isScreenSharing
+              ? "bg-blue-500 hover:bg-blue-600"
+              : "bg-gray-700 hover:bg-gray-600"
+              }`}
           >
             <Monitor className="w-6 h-6 text-white" />
           </button>

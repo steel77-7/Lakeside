@@ -31,7 +31,7 @@ async def websocket_endpoint(websocket: WebSocket):
             res_json = json.loads(res)
             room_id = res_json.get("room_id")
             await manager.connect(websocket, room_id)
-            await manager.handle_message(res_json, room_id)
+            await manager.handle_message(res_json, room_id,websocket)
     except WebSocketDisconnect:
         print("Client disconnected")
 
