@@ -7,6 +7,7 @@ class RoomManager:
         self.rooms: Dict[str, List[WebSocket]] = {}
 
     async def connect(self, socket: WebSocket, room_id: str):
+        socket.send_text('hello')
         if room_id not in self.rooms:
             self.rooms[room_id] = []
         self.rooms[room_id].append(socket)
@@ -14,13 +15,13 @@ class RoomManager:
     async def broadcast(self, room_id: str, message: str):
         room = self.rooms.get(room_id, [])
         for socket in room:
+            print(message)
             await socket.send_text(message)
 
     async def handle_message(self, message: dict, room_id: str):
         message_type = message.get('type')
         msg = json.dumps(message)
-
-        if message_type in ['offer', 'answer', 'sdp']:
+        if message_type in ['offer', 'answer', 'sdp','create-room','join-room']:
             await self.broadcast(room_id, msg)
         elif message_type == 'leave-room':
             await self.leave_room(room_id, message.get('socket'))

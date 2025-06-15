@@ -3,16 +3,79 @@ import { v4 as uuidv4 } from "uuid";
 export class PeerService {
   private ws: WebSocket;
   private peerList: Map<string, RTCPeerConnection>;
-  constructor(soc: WebSocket ) {
+  private localStream: MediaStream | null = null;
+  private remoteStreams: Map<string, MediaStream> = new Map();
+
+  constructor(soc: WebSocket, localStream?: MediaStream) {
     this.peerList = new Map<string, RTCPeerConnection>();
     this.ws = soc;
+    this.localStream = localStream || null;
+  }
+
+  // Add local stream to be shared with peers
+  async addLocalStream(stream: MediaStream) {
+    this.localStream = stream;
+    
+    // Add tracks to all existing peer connections
+    this.peerList.forEach((pc) => {
+      stream.getTracks().forEach((track) => {
+        pc.addTrack(track, stream);
+      });
+    });
+  }
+
+  // Remove local stream
+  removeLocalStream() {
+    if (this.localStream) {
+      this.peerList.forEach((pc) => {
+        const senders = pc.getSenders();
+        senders.forEach((sender) => {
+          if (sender.track && this.localStream?.getTracks().includes(sender.track)) {
+            pc.removeTrack(sender);
+          }
+        });
+      });
+      this.localStream = null;
+    }
+  }
+
+  // Get remote stream for a specific peer
+  getRemoteStream(peerID: string): MediaStream | null {
+    return this.remoteStreams.get(peerID) || null;
+  }
+
+  // Get all remote streams
+  getAllRemoteStreams(): Map<string, MediaStream> {
+    return this.remoteStreams;
+  }
+
+  private setupTrackHandlers(pc: RTCPeerConnection, peerID: string) {
+    // Handle incoming remote tracks
+    pc.ontrack = (event: RTCTrackEvent) => {
+      const remoteStream = event.streams[0];
+      if (remoteStream) {
+        this.remoteStreams.set(peerID, remoteStream);
+        
+        window.dispatchEvent(new CustomEvent('remoteStreamAdded', {
+          detail: { peerID, stream: remoteStream }
+        }));
+      }
+    };
+
+    if (this.localStream) {
+      this.localStream.getTracks().forEach((track) => {
+        pc.addTrack(track, this.localStream!);
+      });
+    }
   }
 
   async addPeer() {
-    // if (this.peerList.has(peerID)) return;
     const peerID = uuidv4();
 
     const pc = new RTCPeerConnection();
+    console.log("add peer");
+    this.setupTrackHandlers(pc, peerID);
+
     pc.onicecandidate = (event: any) => {
       if (event.candidate && this.ws.readyState === WebSocket.OPEN) {
         this.ws.send(
@@ -26,9 +89,11 @@ export class PeerService {
         );
       }
     };
+
     let offer = await pc.createOffer();
     await pc.setLocalDescription(new RTCSessionDescription(offer));
-    if(this.ws && this.ws.readyState===WebSocket.OPEN){
+    
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(
         JSON.stringify({
           type: "offer",
@@ -39,24 +104,33 @@ export class PeerService {
         })
       );
     }
+    
     this.peerList.set(peerID, pc);
   }
 
   async handleSignal(message: any) {
     let message_type = message.type;
     let pc = this.peerList.get(message.payload.sender);
+    console.log(message)
     if (!pc) {
       console.log("peer connection not found ");
       return;
     }
+    
     switch (message_type) {
       case "offer":
         const peerConnection = new RTCPeerConnection();
+        
+        this.setupTrackHandlers(peerConnection, message.payload.peerID);
+        
         await peerConnection.setRemoteDescription(
           new RTCSessionDescription(message.payload.SDP)
         );
-        const answer = peerConnection.createAnswer();
-        if(this.ws.readyState===WebSocket.OPEN){
+        
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        
+        if (this.ws.readyState === WebSocket.OPEN) {
           this.ws.send(
             JSON.stringify({
               type: "answer",
@@ -67,15 +141,18 @@ export class PeerService {
             })
           );
         }
+        
         this.peerList.set(message.payload.peerID, peerConnection);
         break;
+        
       case "answer":
-        pc?.setRemoteDescription(
+        await pc?.setRemoteDescription(
           new RTCSessionDescription(message.payload.SDP)
         );
         break;
+        
       case "ice-candidate":
-        pc?.addIceCandidate(new RTCIceCandidate(message.event.candidate));
+        await pc?.addIceCandidate(new RTCIceCandidate(message.event.candidate));
         break;
     }
   }
@@ -84,6 +161,12 @@ export class PeerService {
     const pc = this.peerList.get(peerID);
     pc?.close();
     this.peerList.delete(peerID);
+    
+    this.remoteStreams.delete(peerID);
+    
+    window.dispatchEvent(new CustomEvent('remoteStreamRemoved', {
+      detail: { peerID }
+    }));
   }
 
   closeAll() {
@@ -91,6 +174,11 @@ export class PeerService {
       pc.close();
     });
     this.peerList.clear();
+    
+    this.remoteStreams.clear();
+    
+    this.removeLocalStream();
   }
 }
+
 export default PeerService;
