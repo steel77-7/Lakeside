@@ -23,11 +23,12 @@ import {
 
 interface Participant {
   id: string;
-  name: string;
-  avatar: string;
+  name: string | null;
+  avatar: string | null;
   isMuted: boolean;
   hasVideo: boolean;
   isHost: boolean;
+  media_ref: React.RefObject<HTMLVideoElement> | null;
 }
 
 const VideoCall: React.FC = () => {
@@ -43,7 +44,9 @@ const VideoCall: React.FC = () => {
   const [callDuration, setCallDuration] = useState(0);
   const [searchParams] = useSearchParams();
   const localVideoRef = useRef<HTMLVideoElement>(null);
-  const [remoteStreams , setRemoteStreams] = useState<MediaStream[]>([])
+  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  const [remoteStreams, setRemoteStreams] = useState<MediaStream[]>([]);
   // Add participants state that was missing
   const [participants, setParticipants] = useState<Participant[]>([
     {
@@ -53,6 +56,7 @@ const VideoCall: React.FC = () => {
       isMuted: true,
       hasVideo: true,
       isHost: true,
+      media_ref: localVideoRef,
     },
     {
       id: "2",
@@ -61,6 +65,7 @@ const VideoCall: React.FC = () => {
       isMuted: true,
       hasVideo: true,
       isHost: false,
+      media_ref: remoteVideoRef,
     },
   ]);
 
@@ -91,13 +96,57 @@ const VideoCall: React.FC = () => {
   // const peerManagerRef = useRef<PeerService |null >(new PeerService(soc.current as WebSocket,playVideoFromCamera().then(r=>{return r})));
   const peerManagerRef = useRef<PeerService | null>(null);
 
-  async function populateRemoteStreams() {
-    peerManagerRef.current?.remoteStreams.forEach((key, val) => {
-      setRemoteStreams((prev:any)=> [...prev , val]) ;
+  /*   function populateRemoteStreams() {
+    peerManagerRef.current?.remoteStreams.forEach((val, key) => {
+      //const rs = useRef<HTMLVideoElement | null>(null);
+      if (rs.current) rs.current.srcObject = val;
+      changeParticipants({
+        id: key,
+        name: null,
+        avatar: null,
+        isMuted: true,
+        hasVideo: true,
+        isHost: false,
+        media_ref: rs,
+      });
+      // setRemoteStreams((prev: any) => [...prev, val]);
+    });
+  } */
+
+  function populateRemoteStreams() {
+    peerManagerRef.current?.remoteStreams.forEach((val, key) => {
+      if( remoteVideoRef.current)
+       remoteVideoRef.current.srcObject = val;
+      //   if (rs.current) rs.current.srcObject = val;
+      changeParticipants({
+        id: key,
+        name: null,
+        avatar: null,
+        isMuted: true,
+        hasVideo: true,
+        isHost: false,
+        media_ref: remoteVideoRef,
+      });
+      // setRemoteStreams((prev: any) => [...prev, val]);
     });
   }
 
-  
+  useEffect(() => {
+    console.log("it changed:", remoteVideoRef.current);
+  }, [remoteVideoRef.current]);
+  function changeParticipants(participant: Participant) {
+    setParticipants((prev: any) => {
+      return [...prev, participant];
+    });
+  }
+
+  useEffect(() => {
+    if (
+      peerManagerRef.current?.remoteStreams &&
+      peerManagerRef.current?.remoteStreams.size > 0
+    )
+      populateRemoteStreams();
+  }, [peerManagerRef.current?.remoteStreams.size]);
 
   async function initializeStream() {
     const stream = await playVideoFromCamera();
@@ -115,7 +164,7 @@ const VideoCall: React.FC = () => {
     if (!soc.current) return;
     if (soc.current?.readyState === WebSocket.OPEN) {
       soc.current.onmessage = (m: any) => {
-      //  console.log(m)
+        //  console.log(m)
         const message = JSON.parse(m.data);
         if (peerManagerRef.current !== null)
           peerManagerRef.current.handleSignal(message);
@@ -220,7 +269,8 @@ const VideoCall: React.FC = () => {
                 key={participant.id}
                 className="relative bg-gray-800 rounded-2xl overflow-hidden"
               >
-                {participant.hasVideo ? (
+                {
+                  /* participant.hasVideo ? (
                   <div className="w-full h-full bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
                     {participant.id === "1" ? (
                       <video
@@ -236,20 +286,32 @@ const VideoCall: React.FC = () => {
                         alt={participant.name}
                         className="w-32 h-32 rounded-full object-cover"
                       />
-                    )}
-                  </div>
-                ) : (
-                  <div className="w-full h-full bg-gray-700 flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="w-20 h-20 bg-gray-600 rounded-full flex items-center justify-center mb-3 mx-auto">
-                        <VideoOff className="w-8 h-8 text-gray-400" />
-                      </div>
-                      <p className="text-gray-300 font-medium">
-                        {participant.name}
-                      </p>
+                    ) */
+                  participant.hasVideo ? (
+                    <div className="w-full h-full bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+                      {
+                        <video
+                          ref={participant.media_ref}
+                          autoPlay
+                          muted={participant.isMuted}
+                          playsInline
+                          className="w-full h-full object-cover rounded-2xl transform scale-x-[-1]"
+                        />
+                      }
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="w-full h-full bg-gray-700 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="w-20 h-20 bg-gray-600 rounded-full flex items-center justify-center mb-3 mx-auto">
+                          <VideoOff className="w-8 h-8 text-gray-400" />
+                        </div>
+                        <p className="text-gray-300 font-medium">
+                          {participant.name}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                }
 
                 {/* Participant Info */}
                 <div className="absolute bottom-4 left-4 flex items-center space-x-2">
@@ -304,8 +366,8 @@ const VideoCall: React.FC = () => {
                         className="flex items-center space-x-3 p-3 bg-gray-700/30 rounded-lg"
                       >
                         <img
-                          src={participant.avatar}
-                          alt={participant.name}
+                          src={participant.avatar || "john doe"}
+                          alt={participant.name || "john doe"}
                           className="w-10 h-10 rounded-full"
                         />
                         <div className="flex-1">

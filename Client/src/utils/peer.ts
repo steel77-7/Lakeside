@@ -11,9 +11,6 @@ export class PeerService {
     this.ws = soc;
     this.localStream = localStream || null;
   }
-
-
-
   
   // Add local stream to be shared with peers
   async addLocalStream(stream: MediaStream) {
@@ -55,6 +52,7 @@ export class PeerService {
   private setupTrackHandlers(pc: RTCPeerConnection, peerID: string) {
     // Handle incoming remote tracks
     pc.ontrack = (event: RTCTrackEvent) => {
+      console.log("yes")
       const remoteStream = event.streams[0];
       if (remoteStream) {
         this.remoteStreams.set(peerID, remoteStream);
@@ -94,7 +92,8 @@ export class PeerService {
 
     let offer = await pc.createOffer();
     await pc.setLocalDescription(new RTCSessionDescription(offer));
-       console.log(`during offer peer :${peerID}`,pc)
+    console.log(pc.signalingState);
+     //  console.log(`during offer peer :${peerID}`,pc)
 
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(
@@ -126,7 +125,7 @@ export class PeerService {
       case "offer":
         const peerConnection = new RTCPeerConnection();
        // console.log(message.payload.sdp)
-       console.log('offer')
+     //  console.log('offer')
         this.setupTrackHandlers(peerConnection, message.payload.peerID);
         await peerConnection.setRemoteDescription(
           new RTCSessionDescription(message.payload.sdp)
@@ -154,7 +153,8 @@ export class PeerService {
       case "answer":
         if( !pc )return 
        // if(pc.connectionState === )
-    console.log(`during asnwer peer :${message.payload.peerID}`,pc)
+   //    console.log(pc.signalingState);
+   // console.log(`during asnwer peer :${message.payload.peerID}`,pc)
        
         await pc?.setRemoteDescription(
           new RTCSessionDescription(message.payload.sdp)
