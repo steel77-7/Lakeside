@@ -14,5 +14,7 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
     );
   }
 
-  return user ? <>{children}</> : <Navigate to="/login" replace />;
+  return  <>{children}</> ;
+
+  //return user ? <>{children}</> : <Navigate to="/login" replace />;
 };

@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 
 interface User {
+  name:string
   id: string;
   email: string;
   username: string;

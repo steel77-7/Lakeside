@@ -43,13 +43,14 @@ const VideoCall: React.FC = () => {
   const [callDuration, setCallDuration] = useState(0);
   const [searchParams] = useSearchParams();
   const localVideoRef = useRef<HTMLVideoElement>(null);
+  const [remoteStreams , setRemoteStreams] = useState<MediaStream[]>([])
   // Add participants state that was missing
   const [participants, setParticipants] = useState<Participant[]>([
     {
       id: "1",
       name: user?.name || "You",
       avatar: user?.avatar || "/api/placeholder/150/150",
-      isMuted: false,
+      isMuted: true,
       hasVideo: true,
       isHost: true,
     },
@@ -57,7 +58,7 @@ const VideoCall: React.FC = () => {
       id: "2",
       name: "John Doe",
       avatar: "/api/placeholder/150/150",
-      isMuted: false,
+      isMuted: true,
       hasVideo: true,
       isHost: false,
     },
@@ -67,10 +68,10 @@ const VideoCall: React.FC = () => {
     try {
       const constraints: MediaStreamConstraints = {
         video: {
-          width: { ideal: 1280 },     
+          width: { ideal: 1280 },
           height: { ideal: 720 },
-          frameRate: { ideal: 30 },   
-          facingMode: "user",        
+          frameRate: { ideal: 30 },
+          facingMode: "user",
         },
         audio: {
           echoCancellation: true,
@@ -90,28 +91,34 @@ const VideoCall: React.FC = () => {
   // const peerManagerRef = useRef<PeerService |null >(new PeerService(soc.current as WebSocket,playVideoFromCamera().then(r=>{return r})));
   const peerManagerRef = useRef<PeerService | null>(null);
 
+  async function populateRemoteStreams() {
+    peerManagerRef.current?.remoteStreams.forEach((key, val) => {
+      setRemoteStreams((prev:any)=> [...prev , val]) ;
+    });
+  }
+
+  
+
   async function initializeStream() {
     const stream = await playVideoFromCamera();
     if (stream && localVideoRef.current) {
       localVideoRef.current.srcObject = stream;
     }
-    peerManagerRef.current = new PeerService(
-      soc.current as WebSocket,
-      stream
-    );
+    peerManagerRef.current = new PeerService(soc.current as WebSocket, stream);
   }
 
   useEffect(() => {
-    initializeStream()
+    initializeStream();
   }, [participants]);
 
   useEffect(() => {
     if (!soc.current) return;
     if (soc.current?.readyState === WebSocket.OPEN) {
       soc.current.onmessage = (m: any) => {
+      //  console.log(m)
         const message = JSON.parse(m.data);
-        if (message.type === "rtc" && peerManagerRef.current !== null)
-          peerManagerRef.current.handleSignal(message.data);
+        if (peerManagerRef.current !== null)
+          peerManagerRef.current.handleSignal(message);
       };
     }
   }, [soc.current]);
@@ -215,22 +222,21 @@ const VideoCall: React.FC = () => {
               >
                 {participant.hasVideo ? (
                   <div className="w-full h-full bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-                    {
-                      participant.id === '1' ?
-                        <video
-                          ref={localVideoRef}
-                          autoPlay
-                          muted={participant.isMuted}
-                          playsInline
-                          className="w-full h-full object-cover rounded-2xl transform scale-x-[-1]"
-                        /> : (
-                          <img
-                            src={participant.avatar}
-                            alt={participant.name}
-                            className="w-32 h-32 rounded-full object-cover"
-                          />
-                        )
-                    }
+                    {participant.id === "1" ? (
+                      <video
+                        ref={localVideoRef}
+                        autoPlay
+                        muted={participant.isMuted}
+                        playsInline
+                        className="w-full h-full object-cover rounded-2xl transform scale-x-[-1]"
+                      />
+                    ) : (
+                      <img
+                        src={participant.avatar}
+                        alt={participant.name}
+                        className="w-32 h-32 rounded-full object-cover"
+                      />
+                    )}
                   </div>
                 ) : (
                   <div className="w-full h-full bg-gray-700 flex items-center justify-center">
@@ -341,10 +347,11 @@ const VideoCall: React.FC = () => {
         <div className="flex items-center justify-center space-x-4">
           <button
             onClick={toggleMute}
-            className={`p-4 rounded-full transition-all duration-200 ${isMuted
-              ? "bg-red-500 hover:bg-red-600"
-              : "bg-gray-700 hover:bg-gray-600"
-              }`}
+            className={`p-4 rounded-full transition-all duration-200 ${
+              isMuted
+                ? "bg-red-500 hover:bg-red-600"
+                : "bg-gray-700 hover:bg-gray-600"
+            }`}
           >
             {isMuted ? (
               <MicOff className="w-6 h-6 text-white" />
@@ -355,10 +362,11 @@ const VideoCall: React.FC = () => {
 
           <button
             onClick={toggleVideo}
-            className={`p-4 rounded-full transition-all duration-200 ${!hasVideo
-              ? "bg-red-500 hover:bg-red-600"
-              : "bg-gray-700 hover:bg-gray-600"
-              }`}
+            className={`p-4 rounded-full transition-all duration-200 ${
+              !hasVideo
+                ? "bg-red-500 hover:bg-red-600"
+                : "bg-gray-700 hover:bg-gray-600"
+            }`}
           >
             {hasVideo ? (
               <Video className="w-6 h-6 text-white" />
@@ -369,10 +377,11 @@ const VideoCall: React.FC = () => {
 
           <button
             onClick={toggleScreenShare}
-            className={`p-4 rounded-full transition-all duration-200 ${isScreenSharing
-              ? "bg-blue-500 hover:bg-blue-600"
-              : "bg-gray-700 hover:bg-gray-600"
-              }`}
+            className={`p-4 rounded-full transition-all duration-200 ${
+              isScreenSharing
+                ? "bg-blue-500 hover:bg-blue-600"
+                : "bg-gray-700 hover:bg-gray-600"
+            }`}
           >
             <Monitor className="w-6 h-6 text-white" />
           </button>

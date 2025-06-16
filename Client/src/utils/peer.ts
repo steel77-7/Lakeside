@@ -4,7 +4,7 @@ export class PeerService {
   private ws: WebSocket;
   private peerList: Map<string, RTCPeerConnection>;
   private localStream: MediaStream | null = null;
-  private remoteStreams: Map<string, MediaStream> = new Map();
+  public remoteStreams: Map<string, MediaStream> = new Map();
 
   constructor(soc: WebSocket, localStream?: MediaStream) {
     this.peerList = new Map<string, RTCPeerConnection>();
@@ -12,6 +12,9 @@ export class PeerService {
     this.localStream = localStream || null;
   }
 
+
+
+  
   // Add local stream to be shared with peers
   async addLocalStream(stream: MediaStream) {
     this.localStream = stream;
@@ -55,7 +58,6 @@ export class PeerService {
       const remoteStream = event.streams[0];
       if (remoteStream) {
         this.remoteStreams.set(peerID, remoteStream);
-        
         window.dispatchEvent(new CustomEvent('remoteStreamAdded', {
           detail: { peerID, stream: remoteStream }
         }));
@@ -92,14 +94,15 @@ export class PeerService {
 
     let offer = await pc.createOffer();
     await pc.setLocalDescription(new RTCSessionDescription(offer));
-    
+       console.log(`during offer peer :${peerID}`,pc)
+
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(
         JSON.stringify({
           type: "offer",
           payload: {
             peerID,
-            SPD: offer,
+            sdp: offer,
           },
         })
       );
@@ -109,26 +112,29 @@ export class PeerService {
   }
 
   async handleSignal(message: any) {
+   // console.log(message)
     let message_type = message.type;
-    let pc = this.peerList.get(message.payload.sender);
-    console.log(message)
-    if (!pc) {
+    let pc = this.peerList.get(message.payload.peerID);
+    //console.log(pc );
+    //console.log(message)
+   /*  if (!pc) {
       console.log("peer connection not found ");
       return;
-    }
+    } */
     
     switch (message_type) {
       case "offer":
         const peerConnection = new RTCPeerConnection();
-        
+       // console.log(message.payload.sdp)
+       console.log('offer')
         this.setupTrackHandlers(peerConnection, message.payload.peerID);
-        
         await peerConnection.setRemoteDescription(
-          new RTCSessionDescription(message.payload.SDP)
+          new RTCSessionDescription(message.payload.sdp)
         );
         
+        this.peerList.set(message.payload.peer,peerConnection)
         const answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
+        await peerConnection.setLocalDescription(new RTCSessionDescription(answer));
         
         if (this.ws.readyState === WebSocket.OPEN) {
           this.ws.send(
@@ -136,7 +142,7 @@ export class PeerService {
               type: "answer",
               payload: {
                 peerID: message.payload.peerID,
-                SDP: answer,
+                sdp: answer,
               },
             })
           );
@@ -146,12 +152,16 @@ export class PeerService {
         break;
         
       case "answer":
+        if( !pc )return 
+       // if(pc.connectionState === )
+    console.log(`during asnwer peer :${message.payload.peerID}`,pc)
+       
         await pc?.setRemoteDescription(
-          new RTCSessionDescription(message.payload.SDP)
+          new RTCSessionDescription(message.payload.sdp)
         );
         break;
         
-      case "ice-candidate":
+      case "ice-candidate":if(!pc) return 
         await pc?.addIceCandidate(new RTCIceCandidate(message.event.candidate));
         break;
     }
@@ -182,3 +192,6 @@ export class PeerService {
 }
 
 export default PeerService;
+
+
+

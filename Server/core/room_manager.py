@@ -17,11 +17,12 @@ class RoomManager:
     #         print(message)
     #         await socket.send_text(message)
 
-    async def broadcast(self, room_id: str, message: str):
+    async def broadcast(self, room_id: str, message: str ,sender_socket:WebSocket):
         to_remove = []
         for socket in self.rooms.get(room_id, []):
             try:
-                await socket.send_text(message)
+                if socket !=sender_socket :
+                 await socket.send_text(message)
             except RuntimeError as e:
                 print(f"Failed to send message: {e}")
                 to_remove.append(socket)
@@ -33,8 +34,9 @@ class RoomManager:
     async def handle_message(self, message: dict, room_id: str, sender_socket: WebSocket):
         message_type = message.get('type')
         msg = json.dumps(message)
-        if message_type in ['offer', 'answer', 'sdp','create-room','join-room']:
-            await self.broadcast(room_id, msg)
+       # print(msg)
+        if message_type in ['offer', 'answer', 'sdp','create-room','join-room','ice-candidate']:
+            await self.broadcast(room_id, msg,sender_socket)
         elif message_type == 'leave-room':
             await self.leave_room(room_id, sender_socket)
 
