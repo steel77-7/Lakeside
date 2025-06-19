@@ -9,7 +9,9 @@ class RoomManager:
     async def connect(self, socket: WebSocket, room_id: str):
         if room_id not in self.rooms:
             self.rooms[room_id] = []
-        self.rooms[room_id].append(socket)
+        if socket not in self.rooms[room_id]:  # Prevent duplicate entries
+            self.rooms[room_id].append(socket)
+
 
     # async def broadcast(self, room_id: str, message: str):
     #     room = self.rooms.get(room_id, [])

@@ -114,39 +114,60 @@ const VideoCall: React.FC = () => {
   } */
 
   function populateRemoteStreams() {
-    peerManagerRef.current?.remoteStreams.forEach((val, key) => {
-      if( remoteVideoRef.current)
-       remoteVideoRef.current.srcObject = val;
-      //   if (rs.current) rs.current.srcObject = val;
-      changeParticipants({
-        id: key,
-        name: null,
-        avatar: null,
-        isMuted: true,
-        hasVideo: true,
-        isHost: false,
-        media_ref: remoteVideoRef,
-      });
-      // setRemoteStreams((prev: any) => [...prev, val]);
+  peerManagerRef.current?.remoteStreams.forEach((stream, peerId) => {
+    console.log(stream)
+    // Check if participant already exists
+    const alreadyExists = participants.some(p => p.id === peerId);
+    if (alreadyExists) return;
+
+    const newRef = React.createRef<HTMLVideoElement>();
+    if (newRef.current) {
+      newRef.current.srcObject = stream;
+    }
+
+
+    changeParticipants({
+      id: peerId,
+      name: null,
+      avatar: null,
+      isMuted: true,
+      hasVideo: true,
+      isHost: false,
+      media_ref: newRef,
     });
-  }
+  });
+}
 
   useEffect(() => {
     console.log("it changed:", remoteVideoRef.current);
   }, [remoteVideoRef.current]);
-  function changeParticipants(participant: Participant) {
-    setParticipants((prev: any) => {
-      return [...prev, participant];
-    });
-  }
+  function changeParticipants(newParticipant: Participant) {
+  setParticipants((prev) => {
+    const exists = prev.some((p) => p.id === newParticipant.id);
+    if (exists) {
+      return prev.map((p) => (p.id === newParticipant.id ? newParticipant : p));
+    }
+    return [...prev, newParticipant];
+  });
+}
 
-  useEffect(() => {
-    if (
-      peerManagerRef.current?.remoteStreams &&
-      peerManagerRef.current?.remoteStreams.size > 0
-    )
-      populateRemoteStreams();
-  }, [peerManagerRef.current?.remoteStreams.size]);
+
+useEffect(() => {
+  if (!peerManagerRef.current) return;
+
+  peerManagerRef.current.remoteStreams.forEach((stream, peerId) => {
+    const participant = participants.find((p) => p.id === peerId);
+    const videoRef = participant?.media_ref?.current;
+
+    if (videoRef && stream) {
+      console.log("✅ Binding stream to videoRef", peerId);
+      videoRef.srcObject = stream;
+    } else {
+      console.warn("⚠️ No videoRef or stream found for", peerId, videoRef, stream);
+    }
+  });
+}, [participants, peerManagerRef.current?.remoteStreams.size]);
+
 
   async function initializeStream() {
     const stream = await playVideoFromCamera();
@@ -226,6 +247,10 @@ const VideoCall: React.FC = () => {
     navigate("/dashboard");
   };
 
+  useEffect(()=>{
+    console.log(participants)
+  },[participants])
+
   return (
     <div className="h-screen bg-gray-900 flex flex-col">
       {/* Header */}
@@ -289,13 +314,16 @@ const VideoCall: React.FC = () => {
                     ) */
                   participant.hasVideo ? (
                     <div className="w-full h-full bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+                      {/* {console.log(participant.id)}
+                    {console.log(participant.media_ref)} */}
                       {
                         <video
                           ref={participant.media_ref}
                           autoPlay
                           muted={participant.isMuted}
                           playsInline
-                          className="w-full h-full object-cover rounded-2xl transform scale-x-[-1]"
+                          className={`w-full h-full object-cover rounded-2xl ${participant.id === "1" ? "transform scale-x-[-1]" : ""
+                            }`}
                         />
                       }
                     </div>
@@ -409,11 +437,10 @@ const VideoCall: React.FC = () => {
         <div className="flex items-center justify-center space-x-4">
           <button
             onClick={toggleMute}
-            className={`p-4 rounded-full transition-all duration-200 ${
-              isMuted
+            className={`p-4 rounded-full transition-all duration-200 ${isMuted
                 ? "bg-red-500 hover:bg-red-600"
                 : "bg-gray-700 hover:bg-gray-600"
-            }`}
+              }`}
           >
             {isMuted ? (
               <MicOff className="w-6 h-6 text-white" />
@@ -424,11 +451,10 @@ const VideoCall: React.FC = () => {
 
           <button
             onClick={toggleVideo}
-            className={`p-4 rounded-full transition-all duration-200 ${
-              !hasVideo
+            className={`p-4 rounded-full transition-all duration-200 ${!hasVideo
                 ? "bg-red-500 hover:bg-red-600"
                 : "bg-gray-700 hover:bg-gray-600"
-            }`}
+              }`}
           >
             {hasVideo ? (
               <Video className="w-6 h-6 text-white" />
@@ -439,11 +465,10 @@ const VideoCall: React.FC = () => {
 
           <button
             onClick={toggleScreenShare}
-            className={`p-4 rounded-full transition-all duration-200 ${
-              isScreenSharing
+            className={`p-4 rounded-full transition-all duration-200 ${isScreenSharing
                 ? "bg-blue-500 hover:bg-blue-600"
                 : "bg-gray-700 hover:bg-gray-600"
-            }`}
+              }`}
           >
             <Monitor className="w-6 h-6 text-white" />
           </button>

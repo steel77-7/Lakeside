@@ -52,7 +52,6 @@ export class PeerService {
   private setupTrackHandlers(pc: RTCPeerConnection, peerID: string) {
     // Handle incoming remote tracks
     pc.ontrack = (event: RTCTrackEvent) => {
-      console.log("yes")
       const remoteStream = event.streams[0];
       if (remoteStream) {
         this.remoteStreams.set(peerID, remoteStream);
