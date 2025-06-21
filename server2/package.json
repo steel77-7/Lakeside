@@ -23,6 +23,7 @@
     "ws": "^8.18.2"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
     "@types/dotenv": "^8.2.3",
     "@types/express": "^5.0.3",
     "@types/ws": "^8.18.1"

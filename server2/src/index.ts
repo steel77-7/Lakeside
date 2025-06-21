@@ -4,13 +4,15 @@ import http from 'http';
 import { MediaSoupService } from "./logic/MediaSoupService"
 import { WebSocket, WebSocketServer } from "ws"
 import { v4 as uuidv4 } from 'uuid';
+import cors from 'cors'
 import { RoomManager } from './logic/RoomManager';
 
 const app = express();
+app.use(cors())
 const PORT = process.env.PORT;
 const mediasoup = new MediaSoupService()
 const server = http.createServer(app)
-const wss = new WebSocketServer({ server })
+const wss = new WebSocketServer({ server, path: "/ws" })
 const roomManager = new RoomManager();
 
 app.get("/health-check", (_req, res) => {
@@ -23,29 +25,33 @@ const send = (ws: WebSocket, type: string, data: any) => {
 }
 
 (async () => {
-    await mediasoup.start()
+    await mediasoup.start();
+
+    server.listen(PORT, () => {
+        console.log(`Serving on PORT ${PORT}`);
+    });
 
     wss.on("connection", (ws: WebSocket) => {
-        const clientId = uuidv4()
+        const clientId = uuidv4();
         let roomId: string | null = null;
 
-        wss.on('message', async (message) => {
+        ws.on('message', async (message) => {
             const { type, data } = JSON.parse(message.toString());
 
             try {
                 switch (type) {
                     case "createRoom":
-                        roomManager.createRoom(data.roomId)
-                        send(ws, "roomCreated", {})
+                        roomManager.createRoom(data.roomId);
+                        send(ws, "roomCreated", {});
                         break;
 
                     case "joinRoom":
                         roomId = data.roomId;
                         if (roomId) {
-                            roomManager.joinRoom(roomId, clientId)
+                            roomManager.joinRoom(roomId, clientId);
                             send(ws, "joinedRoom", {
                                 rtpCapabilities: mediasoup.getRtpCapabilities()
-                            })
+                            });
                         }
                         break;
 
@@ -58,13 +64,13 @@ const send = (ws: WebSocket, type: string, data: any) => {
 
                     case 'connectTransport': {
                         const peer = roomManager.getPeer(roomId!, clientId);
-                        const transport = peer?.transports.find(t => t.id === data.transportId)
+                        const transport = peer?.transports.find(t => t.id === data.transportId);
                         const producer = await transport!.produce({
                             kind: data.kind,
                             rtpParameters: data.rtpParameters
-                        })
-                        roomManager.addProducer(roomId!, clientId, producer)
-                        send(ws, 'produced', { id: producer.id })
+                        });
+                        roomManager.addProducer(roomId!, clientId, producer);
+                        send(ws, 'produced', { id: producer.id });
                         break;
                     }
 
@@ -74,13 +80,9 @@ const send = (ws: WebSocket, type: string, data: any) => {
             } catch (error: any) {
                 send(ws, "error", { message: error.message });
             }
-        })
+        });
         ws.on('close', () => {
-            if (roomId) roomManager.removePeer(roomId, clientId)
-        })
-    })
-
-    app.listen(PORT, () => {
-        console.log(`Serving on PORT ${PORT}`)
-    })
-})()
+            if (roomId) roomManager.removePeer(roomId, clientId);
+        });
+    });
+})();
