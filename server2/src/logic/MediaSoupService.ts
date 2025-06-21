@@ -17,8 +17,8 @@ export class MediaSoupService {
                 },
                 {
                     kind: "video",
-                    mimeType: "video/VP8",
-                    clockRate: 48000,
+                    mimeType: "video/H264",
+                    clockRate: 90000,
                 }
             ]
         })
