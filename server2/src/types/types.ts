@@ -1,8 +1,9 @@
-import { Producer, WebRtcTransport } from "mediasoup/node/lib/types";
+import { Producer, WebRtcTransport, Consumer } from "mediasoup/node/lib/types";
 
 export interface PeerInfo {
   transports: WebRtcTransport[];
   producers: Producer[];
+  consumers:Consumer[]
 }
 
 export interface Room {
