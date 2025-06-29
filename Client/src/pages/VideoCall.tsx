@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef,useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useSearchParams } from "react-router-dom";
@@ -44,7 +44,7 @@ const VideoCall: React.FC = () => {
   const [showChat, setShowChat] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [searchParams] = useSearchParams();
-  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const localVideoRef = useRef<HTMLVideoElement|null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const deviceRef = useRef(new Device());
   const [remoteStreams, setRemoteStreams] = useState<MediaStream[]>([]);
@@ -96,6 +96,30 @@ const VideoCall: React.FC = () => {
 
   const soc = useSoc();
 
+
+
+
+    const setVideoSrcObject = (
+        videoEl: HTMLVideoElement | null,
+        stream: MediaStream | null | undefined
+    ) => {
+        if (!videoEl || !stream) return;
+        if (videoEl.srcObject !== stream) {
+            videoEl.srcObject = stream;
+            videoEl.play().catch(() => { });
+        }
+    };
+
+    const setVideoRef = useCallback((node: HTMLVideoElement | null) => {
+        if (node !== null) {
+            localVideoRef.current = node;
+
+            if (localVideoRef.current) {
+                node.srcObject = localVideoRef.current;
+                node.play().catch(() => { });
+            }
+        }
+    }, [localVideoRef, localVideoRef.current]);
   // const peerManagerRef = useRef<PeerService |null >(new PeerService(soc.current as WebSocket,playVideoFromCamera().then(r=>{return r})));
   // const peerManagerRef = useRef<PeerService | null>(null);
 
