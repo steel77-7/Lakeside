@@ -34,28 +34,37 @@ const send = (ws: WebSocket, type: string, data: any) => {
   wss.on("connection", (ws: WebSocket) => {
     const clientId = uuidv4();
     let roomId: string | null = null;
-
+    console.log(1);
     ws.on("message", async (message) => {
+      //  console.log(message)
       const { type, data } = JSON.parse(message.toString());
-
+      console.log(type, data);
       try {
         switch (type) {
-          case "createRoom":
+        /*   case "createRoom":
+            console.log("created room ");
             roomManager.createRoom(data.roomId);
             send(ws, "roomCreated", {});
-            break;
+            break; */
 
           case "joinRoom":
+            
             roomId = data.roomId;
             if (roomId) {
+              if (!roomManager.rooms.get(roomId))
+                roomManager.createRoom(data.roomId);
+              
               roomManager.joinRoom(roomId, clientId);
-              send(ws, "joinedRoom", {
+              send(ws, "joinedRoom", {  
                 rtpCapabilities: mediasoup.getRtpCapabilities(),
               });
             }
+            console.log("joined room ");
             break;
 
           case "createTransport": {
+            console.log("transport created ");
+
             const { transport, params } =
               await mediasoup.createWebRtcTransport();
             roomManager.addTransporter(roomId!, clientId, transport);
@@ -64,6 +73,8 @@ const send = (ws: WebSocket, type: string, data: any) => {
           }
 
           case "connectTransport": {
+            console.log("connect trasnport");
+
             const peer = roomManager.getPeer(roomId!, clientId);
             const transport = peer?.transports.find(
               (t) => t.id === data.transportId
@@ -78,6 +89,8 @@ const send = (ws: WebSocket, type: string, data: any) => {
           }
 
           case "createConsumerTranport": {
+            console.log("create consumer transport ");
+
             const { transport, params } =
               await mediasoup.createWebRtcTransport();
             roomManager.addTransporter(roomId!, clientId, transport);
@@ -85,10 +98,11 @@ const send = (ws: WebSocket, type: string, data: any) => {
             break;
           }
           case "connectConsumerTranport": {
+            console.log("connect  consumer trasnport");
+
             const peer = roomManager.getPeer(roomId!, clientId);
             const transport = peer?.transports.find(
-              (t) => t.id,
-              data.transportId
+              (t) => t.id === data.transportId
             );
             transport?.connect({ dtlsParameters: data.dtlsParameters });
             send(ws, "consumerTransportConnected", {});
@@ -96,6 +110,8 @@ const send = (ws: WebSocket, type: string, data: any) => {
           }
 
           case "consumeMedia": {
+            console.log("consumer media ");
+
             const peer = roomManager.getPeer(roomId!, clientId);
             const transport = peer?.transports.find(
               (t) => t.id === data.transportId
@@ -120,9 +136,12 @@ const send = (ws: WebSocket, type: string, data: any) => {
             break;
           }
 
-          /*case "resumePausedConsumer": {
+          /*
+          case "resumePausedConsumer": {
+            
             break;
-          } */
+          } 
+          */
           default:
             send(ws, "error", { message: "Unknown type" });
         }

@@ -2,7 +2,7 @@ import { Room, PeerInfo } from "../types/types";
 import { WebRtcTransport, Producer, Consumer } from "mediasoup/node/lib/types";
 
 export class RoomManager {
-  private rooms: Map<string, Room> = new Map();
+  public rooms: Map<string, Room> = new Map();
 
   createRoom(roomId: string) {
     if (this.rooms.has(roomId)) throw new Error("Room already exists");

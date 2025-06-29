@@ -20,6 +20,7 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
+import { Device } from "mediasoup-client";
 
 interface Participant {
   id: string;
@@ -45,8 +46,10 @@ const VideoCall: React.FC = () => {
   const [searchParams] = useSearchParams();
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
-
+  const deviceRef = useRef(new Device());
   const [remoteStreams, setRemoteStreams] = useState<MediaStream[]>([]);
+  const sendTransportRef = useRef<any>(null);
+  const recvTransportRef = useRef<any>(null);
   // Add participants state that was missing
   const [participants, setParticipants] = useState<Participant[]>([
     {
@@ -94,7 +97,7 @@ const VideoCall: React.FC = () => {
   const soc = useSoc();
 
   // const peerManagerRef = useRef<PeerService |null >(new PeerService(soc.current as WebSocket,playVideoFromCamera().then(r=>{return r})));
-  const peerManagerRef = useRef<PeerService | null>(null);
+  // const peerManagerRef = useRef<PeerService | null>(null);
 
   /*   function populateRemoteStreams() {
     peerManagerRef.current?.remoteStreams.forEach((val, key) => {
@@ -113,68 +116,72 @@ const VideoCall: React.FC = () => {
     });
   } */
 
-  function populateRemoteStreams() {
-  peerManagerRef.current?.remoteStreams.forEach((stream, peerId) => {
-    console.log(stream)
-    // Check if participant already exists
-    const alreadyExists = participants.some(p => p.id === peerId);
-    if (alreadyExists) return;
+  /*  function populateRemoteStreams() {
+    peerManagerRef.current?.remoteStreams.forEach((stream, peerId) => {
+      console.log(stream);
+      // Check if participant already exists
+      const alreadyExists = participants.some((p) => p.id === peerId);
+      if (alreadyExists) return;
 
-    const newRef = React.createRef<HTMLVideoElement>();
-    if (newRef.current) {
-      newRef.current.srcObject = stream;
-    }
+      const newRef = React.createRef<HTMLVideoElement>();
+      if (newRef.current) {
+        newRef.current.srcObject = stream;
+      }
 
-
-    changeParticipants({
-      id: peerId,
-      name: null,
-      avatar: null,
-      isMuted: true,
-      hasVideo: true,
-      isHost: false,
-      media_ref: newRef,
+      changeParticipants({
+        id: peerId,
+        name: null,
+        avatar: null,
+        isMuted: true,
+        hasVideo: true,
+        isHost: false,
+        media_ref: newRef,
+      });
     });
-  });
-}
+  } */
 
   useEffect(() => {
     console.log("it changed:", remoteVideoRef.current);
   }, [remoteVideoRef.current]);
   function changeParticipants(newParticipant: Participant) {
-  setParticipants((prev) => {
-    const exists = prev.some((p) => p.id === newParticipant.id);
-    if (exists) {
-      return prev.map((p) => (p.id === newParticipant.id ? newParticipant : p));
-    }
-    return [...prev, newParticipant];
-  });
-}
+    setParticipants((prev) => {
+      const exists = prev.some((p) => p.id === newParticipant.id);
+      if (exists) {
+        return prev.map((p) =>
+          p.id === newParticipant.id ? newParticipant : p
+        );
+      }
+      return [...prev, newParticipant];
+    });
+  }
 
+  /*   useEffect(() => {
+    if (!peerManagerRef.current) return;
 
-useEffect(() => {
-  if (!peerManagerRef.current) return;
+    peerManagerRef.current.remoteStreams.forEach((stream, peerId) => {
+      const participant = participants.find((p) => p.id === peerId);
+      const videoRef = participant?.media_ref?.current;
 
-  peerManagerRef.current.remoteStreams.forEach((stream, peerId) => {
-    const participant = participants.find((p) => p.id === peerId);
-    const videoRef = participant?.media_ref?.current;
-
-    if (videoRef && stream) {
-      console.log("✅ Binding stream to videoRef", peerId);
-      videoRef.srcObject = stream;
-    } else {
-      console.warn("⚠️ No videoRef or stream found for", peerId, videoRef, stream);
-    }
-  });
-}, [participants, peerManagerRef.current?.remoteStreams.size]);
-
+      if (videoRef && stream) {
+        console.log("✅ Binding stream to videoRef", peerId);
+        videoRef.srcObject = stream;
+      } else {
+        console.warn(
+          "⚠️ No videoRef or stream found for",
+          peerId,
+          videoRef,
+          stream
+        );
+      }
+    });
+  }, [participants, peerManagerRef.current?.remoteStreams.size]); */
 
   async function initializeStream() {
     const stream = await playVideoFromCamera();
     if (stream && localVideoRef.current) {
       localVideoRef.current.srcObject = stream;
     }
-    peerManagerRef.current = new PeerService(soc.current as WebSocket, stream);
+    //  peerManagerRef.current = new PeerService(soc.current as WebSocket, stream);
   }
 
   useEffect(() => {
@@ -183,12 +190,141 @@ useEffect(() => {
 
   useEffect(() => {
     if (!soc.current) return;
+    const device = deviceRef.current;
     if (soc.current?.readyState === WebSocket.OPEN) {
-      soc.current.onmessage = (m: any) => {
+      soc.current.onmessage = async (m: any) => {
         //  console.log(m)
         const message = JSON.parse(m.data);
-        if (peerManagerRef.current !== null)
-          peerManagerRef.current.handleSignal(message);
+        switch (message.type) {
+          case "roomCreated": {
+
+            break;
+          }
+          case "joinedRoom":
+            // 1. Load RTP Capabilities
+            //  device = new Device();
+            deviceRef.current = device;
+            await device.load({
+              routerRtpCapabilities: message.data.rtpCapabilities,
+            });
+            // 2. Create send transport
+            soc.current?.send(
+              JSON.stringify({ type: "createTransport", data: { roomId } })
+            );
+            break;
+
+          case "transportCreated":
+            // 3. Create the local send transport
+            if (!deviceRef.current) return;
+            sendTransportRef.current = deviceRef.current.createSendTransport(
+              message.data
+            );
+            // 4. transport connect event
+            sendTransportRef.current.on(
+              "connect",
+              ({ dtlsParameters }: any, callback: any) => {
+                soc.current?.send(
+                  JSON.stringify({
+                    type: "connectTransport",
+                    data: {
+                      roomId,
+                      transportId: sendTransportRef.current.id,
+                      kind: "video",
+                      dtlsParameters,
+                    },
+                  })
+                );
+                callback();
+              }
+            );
+            // 5. transport produce event
+            sendTransportRef.current.on(
+              "produce",
+              async ({ kind, rtpParameters }: any, callback: any) => {
+                soc.current?.send(
+                  JSON.stringify({
+                    type: "connectTransport",
+                    data: {
+                      roomId,
+                      transportId: sendTransportRef.current.id,
+                      kind,
+                      rtpParameters,
+                    },
+                  })
+                );
+                callback({ id: sendTransportRef.current.id }); // ID will be replaced by backend response
+              }
+            );
+            // 6. Start producing local tracks\
+            const stream = await playVideoFromCamera();
+            if (!stream) return;
+            for (const track of stream?.getTracks()) {
+              await sendTransportRef.current.produce({ track });
+            }
+            // 7. Create consumer transport for receiving remote media
+            soc.current?.send(
+              JSON.stringify({
+                type: "createConsumerTranport",
+                data: { roomId },
+              })
+            );
+            break;
+
+          case "consumerTransportCreated":
+            // 8. Create the local receive (consumer) transport
+            if (!deviceRef.current) return;
+            recvTransportRef.current = deviceRef.current.createRecvTransport(
+              message.data
+            );
+            recvTransportRef.current.on(
+              "connect",
+              ({ dtlsParameters }: any, callback: any) => {
+                soc.current?.send(
+                  JSON.stringify({
+                    type: "connectConsumerTranport",
+                    data: {
+                      roomId,
+                      transportId: recvTransportRef.current.id,
+                      dtlsParameters,
+                    },
+                  })
+                );
+                callback();
+              }
+            );
+            // 9. Ask for consumers
+            soc.current?.send(
+              JSON.stringify({
+                type: "consumeMedia",
+                data: {
+                  roomId,
+                  transportId: recvTransportRef.current.id,
+                  rtpCapabilities: deviceRef.current.rtpCapabilities,
+                },
+              })
+            );
+            break;
+
+          case "consumers":
+            // 10. For each remote producer, create a consumer and attach its stream to video
+            console.log(message.data.consumers)
+            for (const consumerData of message.data.consumers) {
+              const consumer = await recvTransportRef.current.consume({
+                id: consumerData.id,
+                producerId: consumerData.producerId,
+                kind: consumerData.kind,
+                rtpParameters: consumerData.rtpParameters,
+              });
+              const remoteStream = new MediaStream([consumer.track]);
+              //console.log(remoteStream)
+              if (remoteVideoRef.current)
+                remoteVideoRef.current.srcObject = remoteStream;
+              console.log("ibgidsf",remoteVideoRef.current)
+            }
+            break;
+        }
+        /*   if (peerManagerRef.current !== null)
+          peerManagerRef.current.handleSignal(message); */
       };
     }
   }, [soc.current]);
@@ -199,19 +335,19 @@ useEffect(() => {
     if (soc.current && soc.current?.readyState === WebSocket.OPEN) {
       soc.current.send(
         JSON.stringify({
-          type: "create-room",
-          room_id: roomId,
+          type: "joinRoom",
+          data: { roomId },
         })
       );
     }
-    if (peerManagerRef.current !== null) peerManagerRef.current.addPeer();
+    // if (peerManagerRef.current !== null) peerManagerRef.current.addPeer();
     const timer = setInterval(() => {
       setCallDuration((prev) => prev + 1);
     }, 1000);
 
     return () => clearInterval(timer);
   }, [soc.current]);
-
+ 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -247,9 +383,9 @@ useEffect(() => {
     navigate("/dashboard");
   };
 
-  useEffect(()=>{
-    console.log(participants)
-  },[participants])
+  useEffect(() => {
+    console.log(participants);
+  }, [participants]);
 
   return (
     <div className="h-screen bg-gray-900 flex flex-col">
@@ -322,8 +458,11 @@ useEffect(() => {
                           autoPlay
                           muted={participant.isMuted}
                           playsInline
-                          className={`w-full h-full object-cover rounded-2xl ${participant.id === "1" ? "transform scale-x-[-1]" : ""
-                            }`}
+                          className={`w-full h-full object-cover rounded-2xl ${
+                            participant.id === "1"
+                              ? "transform scale-x-[-1]"
+                              : ""
+                          }`}
                         />
                       }
                     </div>
@@ -437,10 +576,11 @@ useEffect(() => {
         <div className="flex items-center justify-center space-x-4">
           <button
             onClick={toggleMute}
-            className={`p-4 rounded-full transition-all duration-200 ${isMuted
+            className={`p-4 rounded-full transition-all duration-200 ${
+              isMuted
                 ? "bg-red-500 hover:bg-red-600"
                 : "bg-gray-700 hover:bg-gray-600"
-              }`}
+            }`}
           >
             {isMuted ? (
               <MicOff className="w-6 h-6 text-white" />
@@ -451,10 +591,11 @@ useEffect(() => {
 
           <button
             onClick={toggleVideo}
-            className={`p-4 rounded-full transition-all duration-200 ${!hasVideo
+            className={`p-4 rounded-full transition-all duration-200 ${
+              !hasVideo
                 ? "bg-red-500 hover:bg-red-600"
                 : "bg-gray-700 hover:bg-gray-600"
-              }`}
+            }`}
           >
             {hasVideo ? (
               <Video className="w-6 h-6 text-white" />
@@ -465,10 +606,11 @@ useEffect(() => {
 
           <button
             onClick={toggleScreenShare}
-            className={`p-4 rounded-full transition-all duration-200 ${isScreenSharing
+            className={`p-4 rounded-full transition-all duration-200 ${
+              isScreenSharing
                 ? "bg-blue-500 hover:bg-blue-600"
                 : "bg-gray-700 hover:bg-gray-600"
-              }`}
+            }`}
           >
             <Monitor className="w-6 h-6 text-white" />
           </button>
